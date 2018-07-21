@@ -1,0 +1,74 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  DBUser:
+    Description: RDS Database Username
+    Type: String
+  DBPassword:
+    Description: RDS Database Password
+    Type: String
+    NoEcho: True
+  DBClass:
+    Description: RDS Database Instance Class
+    Type: String
+    Default: db.t2.medium
+  DBAllocatedStorage:
+    Description: RDS Database Allocated Storage (GB)
+    Type: String
+    Default: 20
+  DBVPCID:
+    Description: RDS Database VPC ID
+    Type: AWS::EC2::VPC::Id
+  DBSubnetID1:
+    Description: RDS Database Subnet ID 1
+    Type: AWS::EC2::Subnet::Id
+  DBSubnetID2:
+    Description: RDS Database Subnet ID 2
+    Type: AWS::EC2::Subnet::Id
+  DBPubliclyAccessible:
+    Description: Is the RDS Database Publicly Accessible
+    Type: String
+  DBAccessCIDR:
+    Description: RDS Database Security Group Access CIDR
+    Type: String
+
+Outputs:
+  DBEndpoint:
+    Description: RDS Database Endpoint
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub 'DBEndpoint'
+
+Resources:
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Database access security group
+      VpcId: !Ref DBVPCID
+      SecurityGroupIngress:
+      - CidrIp: !Ref DBAccessCIDR
+        IpProtocol: tcp
+        FromPort: '5432'
+        ToPort: '5432'
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: The subnets used by the DB
+      SubnetIds:
+      - !Ref DBSubnetID1
+      - !Ref DBSubnetID2
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      DBInstanceClass: !Ref DBClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: !Ref DBPubliclyAccessible
+      VPCSecurityGroups:
+      - !GetAtt DBEC2SecurityGroup.GroupId

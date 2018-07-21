@@ -1,0 +1,34 @@
+---
+# Usage: 
+# AWS_PROFILE=<profile> ansible-playbook ansible-deploy-stack.yaml --extra-vars"vars_file=database-template-vars.yaml env=dev"
+
+- name: Deploy CloudFormation Stack
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - "{{ vars_file }}"
+
+  tasks:
+    - name: Rotate SSM Parameter Secret Values
+      aws_ssm_parameter_store:
+        name: "{{ item.name }}"
+        description: "{{ item.description }}"
+        string_type: SecureString
+        value: "{{ lookup('password', '/dev/null length=20 chars=hexdigits,-,_,#,!,$,%,&') }}"
+      loop: "{{ rotating_secrets }}"
+
+    - name: Create/Update CF Stack
+      cloudformation: 
+        template: "{{ template }}"
+        stack_name: "{{ environments[env].stack_name }}"
+        state: present
+        region: "{{ environments[env].region }}"
+        disable_rollback: false
+        template_parameters: "{{ environments[env].template_parameters }}"
+      register: stack
+
+    - name: Print Stack Outputs
+      debug: 
+        msg: "Stack Outputs: {{stack.stack_outputs}}"
